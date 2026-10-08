@@ -5,7 +5,8 @@
   const localKey = 'imperial-player-card:v1:' + id;
   const cloudEnabled = globalThis.CardCloud?.enabled;
   const key = cloudEnabled ? 'imperial-player-card:cloud-cache:' + id : localKey;
-  let cloud = null, canEdit = !cloudEnabled;
+  let cloud = null, canEdit = !cloudEnabled, canManageSkills = false;
+  let skills = CardSkills.initial(id);
   const get = name => document.getElementById(name);
   let state = model.initial(id);
   let storageAvailable = true;
@@ -28,14 +29,16 @@
       : 'Браузер не разрешил сохранение. Изменения действуют до закрытия или обновления страницы.';
   }
   function applyAccess() {
-    document.querySelectorAll('main button,main input').forEach(el=>{
+    document.querySelectorAll('main button,main input,main textarea').forEach(el=>{
       if(el.closest('#cloud-panel')) return;
       if(!canEdit) el.disabled=true;
     });
   }
-  function access(allowed) {
-    canEdit=allowed;
-    document.querySelectorAll('main button,main input').forEach(el=>{
+  function access(allowed, manageSkills = false) {
+    canEdit=allowed; canManageSkills=manageSkills;
+    get('add-skill').hidden=!canManageSkills;
+    if(!canManageSkills) get('skill-form').hidden=true;
+    document.querySelectorAll('main button,main input,main textarea').forEach(el=>{
       if(!el.closest('#cloud-panel')) el.disabled=false;
     });
     render();
@@ -87,6 +90,13 @@
       row.append(text, remove);
       list.append(row);
     });
+    const skillList=get('skills-list'); skillList.replaceChildren();
+    skills.forEach(skill=>{
+      const article=document.createElement('article'),row=document.createElement('p'),name=document.createElement('span'),level=document.createElement('strong');
+      name.textContent=skill.name;level.textContent=skill.level+' уровень';row.append(name,level);article.append(row);
+      if(skill.description){const note=document.createElement('div');note.className='hint skill-description';note.textContent=skill.description;article.append(note);}
+      skillList.append(article);
+    });
     applyAccess();
   }
   async function update(next, message = '') {
@@ -103,6 +113,20 @@
     storageMessage();
     get('action-status').textContent = message;
   }
+  get('add-skill').addEventListener('click',()=>{
+    if(!canManageSkills||!canEdit)return;
+    get('skill-form').hidden=false;get('add-skill').setAttribute('aria-expanded','true');get('skill-name').focus();
+  });
+  get('cancel-skill').addEventListener('click',()=>{get('skill-form').hidden=true;get('add-skill').setAttribute('aria-expanded','false');get('add-skill').focus();});
+  get('skill-form').addEventListener('submit',async event=>{
+    event.preventDefault();if(!cloud||!canManageSkills||!canEdit)return;
+    try{
+      const next=CardSkills.add(skills,get('skill-name').value,Number(get('skill-level').value),get('skill-description').value);
+      await cloud.saveSkills(next);
+      get('skill-form').reset();get('skill-form').hidden=true;get('add-skill').setAttribute('aria-expanded','false');
+      get('skill-status').textContent='Навык добавлен и сохранён для игрока.';get('add-skill').focus();
+    }catch(error){get('skill-status').textContent=error.message;}
+  });
   get('hp-minus').addEventListener('click', () => update(model.hp(state, -1)));
   get('edit-armor').addEventListener('click',()=>{
     const form=get('armor-form');form.hidden=!form.hidden;
@@ -151,7 +175,7 @@
       state=next;
       try {localStorage.setItem(key,JSON.stringify(state));}catch{}
       render();
-    },onStatus(message){get('save-status').textContent=message;},onAccess:access})
+    },onSkills(next){skills=next;render();},onStatus(message){get('save-status').textContent=message;},onAccess:access})
     .then(connection=>{cloud=connection;})
     .catch(error=>{access(false);get('save-status').textContent=error.message;});
   }
