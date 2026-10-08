@@ -2,21 +2,43 @@
   const id = document.body.dataset.character;
   if (!['neko', 'human'].includes(id)) return;
   const model = globalThis.CardState;
-  const key = 'imperial-player-card:v1:' + id;
+  const localKey = 'imperial-player-card:v1:' + id;
+  const cloudEnabled = globalThis.CardCloud?.enabled;
+  const key = cloudEnabled ? 'imperial-player-card:cloud-cache:' + id : localKey;
+  let cloud = null, canEdit = !cloudEnabled;
   const get = name => document.getElementById(name);
   let state = model.initial(id);
   let storageAvailable = true;
   try {
     const saved = localStorage.getItem(key);
     if (saved) {
-      try { state = model.normalize(JSON.parse(saved), id); }
+      try {
+        const parsed=JSON.parse(saved);
+        if(!parsed.revision) localStorage.setItem(key+':before-session-1',saved);
+        state = model.migrate(parsed,id);
+        localStorage.setItem(key,JSON.stringify(state));
+      }
       catch { get('save-status').textContent = 'Сохранённые данные повреждены. Проверь значения и внеси их заново.'; }
     }
   } catch { storageAvailable = false; }
   function storageMessage() {
+    if(cloudEnabled) return;
     get('save-status').textContent = storageAvailable
       ? 'Сохранено в этом браузере. Другие устройства не синхронизируются.'
       : 'Браузер не разрешил сохранение. Изменения действуют до закрытия или обновления страницы.';
+  }
+  function applyAccess() {
+    document.querySelectorAll('main button,main input').forEach(el=>{
+      if(el.closest('#cloud-panel')) return;
+      if(!canEdit) el.disabled=true;
+    });
+  }
+  function access(allowed) {
+    canEdit=allowed;
+    document.querySelectorAll('main button,main input').forEach(el=>{
+      if(!el.closest('#cloud-panel')) el.disabled=false;
+    });
+    render();
   }
   function render() {
     const limit=model.hpLimit(state);
@@ -65,8 +87,15 @@
       row.append(text, remove);
       list.append(row);
     });
+    applyAccess();
   }
-  function update(next, message = '') {
+  async function update(next, message = '') {
+    if(cloudEnabled) {
+      if(!cloud || !canEdit) {get('action-status').textContent='Войди и дождись загрузки общей карточки.';return;}
+      try { await cloud.save(next); get('action-status').textContent=message; }
+      catch(error) {get('action-status').textContent=error.message;}
+      return;
+    }
     state = next;
     try { localStorage.setItem(key, JSON.stringify(state)); storageAvailable = true; }
     catch { storageAvailable = false; }
@@ -110,10 +139,20 @@
     get('item-name').focus();
   });
   window.addEventListener('storage', event => {
-    if (event.key !== key) return;
-    try { state = model.normalize(event.newValue ? JSON.parse(event.newValue) : null, id); render(); }
+    if (cloudEnabled || event.key !== key) return;
+    try { state = model.migrate(event.newValue ? JSON.parse(event.newValue) : null, id); render(); }
     catch { /* Сохраняем текущие значения при повреждённых данных другой вкладки. */ }
   });
   render();
   if (!storageAvailable) storageMessage();
+  if(cloudEnabled) {
+    get('save-status').textContent='Загружаем общую карточку…';
+    CardCloud.start({id,onState(next){
+      state=next;
+      try {localStorage.setItem(key,JSON.stringify(state));}catch{}
+      render();
+    },onStatus(message){get('save-status').textContent=message;},onAccess:access})
+    .then(connection=>{cloud=connection;})
+    .catch(error=>{access(false);get('save-status').textContent=error.message;});
+  }
 })();

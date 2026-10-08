@@ -9,9 +9,10 @@ globalThis.CardState = (() => {
   const whole = (value, fallback, min, max) => Number.isSafeInteger(value)
     ? Math.min(max, Math.max(min, value)) : fallback;
   function initial(id) {
-    return { id, gear:gearDefaults(id), hp: 5, coins: 0, items: [
+    return { id, gear:gearDefaults(id), revision: 1, hp: 5, coins: id === 'neko' ? 296 : 386, items: [
       { name: id === 'neko' ? 'Длинный лук из дуба' : 'Глефа из железа', quantity: 1 },
-      { name: 'Туника', quantity: 1 }
+      { name: 'Туника', quantity: 1 },
+      { name: id === 'neko' ? 'Стрелы' : 'Кинжалы', quantity: id === 'neko' ? 9 : 3 }
     ] };
   }
   function normalize(value, id) {
@@ -21,7 +22,7 @@ globalThis.CardState = (() => {
     const gear={...gearDefaults(id),armorName:typeof g.armorName==='string'&&g.armorName.trim()?g.armorName.trim().slice(0,120):'Туника',armorHp:whole(g.armorHp,0,0,999),weaponName:typeof g.weaponName==='string'&&g.weaponName.trim()?g.weaponName.trim().slice(0,120):gearDefaults(id).weaponName,damage:typeof g.damage==='string'&&g.damage.trim()?g.damage.trim().slice(0,50):gearDefaults(id).damage,bonuses:Array.from({length:10},(_,i)=>whole(g.bonuses?.[i],0,0,999))};
     gear.range=typeof g.range==='string'&&g.range.trim()?g.range.trim().slice(0,80):gearDefaults(id).range;
     return {
-      id, gear,
+      id, gear, revision: whole(value.revision,0,0,999),
       hp: whole(value.hp, 5, 0, hpLimit({id,gear})),
       coins: whole(value.coins, 0, 0, maxCoins),
       items: Array.isArray(value.items) ? value.items.filter(item =>
@@ -29,6 +30,12 @@ globalThis.CardState = (() => {
         Number.isSafeInteger(item.quantity) && item.quantity > 0
       ).map(item => ({ name: item.name.trim().slice(0, 120), quantity: Math.min(9999, item.quantity) })) : fallback.items
     };
+  }
+  function migrate(value, id) {
+    const state=normalize(value,id);
+    if(state.revision>=1) return state;
+    const snapshot=initial(id);
+    return {...state,revision:1,coins:snapshot.coins,items:snapshot.items};
   }
   function hp(state, delta) {
     return { ...state, hp: whole(state.hp + delta, state.hp, 0, hpLimit(state)) };
@@ -55,5 +62,5 @@ globalThis.CardState = (() => {
     next.hp=state.hp===0?0:Math.max(0,Math.min(hpLimit(next),state.hp+hpLimit(next)-hpLimit(state)));
     return next;
   }
-  return { maxHp, maxCoins, initial, normalize, hp, coins, add, remove, totalStats, hpLimit, equip };
+  return { maxHp, maxCoins, initial, normalize, migrate, hp, coins, add, remove, totalStats, hpLimit, equip };
 })();

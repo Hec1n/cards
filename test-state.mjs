@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 const sandbox = {};
 vm.runInNewContext(fs.readFileSync(new URL('card-state.js', import.meta.url),'utf8'), sandbox);
 const m = sandbox.CardState;
-let s = m.initial('neko');
+let s = {...m.initial('neko'),coins:0};
 assert.equal(s.hp,5);
 assert.equal(m.hp(s,1).hp,5);
 for(let i=0;i<8;i++) s=m.hp(s,-1);
@@ -24,7 +24,7 @@ assert.equal(restored.hp,1);assert.equal(restored.coins,175);
 assert.equal(m.normalize({hp:99,coins:-3,items:[null,{}]},'human').hp,5);
 assert.equal(m.normalize({hp:99,coins:-3,items:[null,{}]},'human').coins,0);
 assert.equal(m.initial('human').items[0].name,'Глефа из железа');
-assert.equal(m.initial('human').coins,0);
+assert.equal(m.initial('human').coins,386);
 console.log('OK: HP bounds, coins, inventory, persistence round-trip and invalid data.');
 let geared=m.hp(m.initial('neko'),-2);
 geared=m.equip(geared,{armorName:'Кожаная броня',armorHp:3});assert.equal(m.hpLimit(geared),8);assert.equal(geared.hp,6);
@@ -34,3 +34,9 @@ geared=m.equip(geared,{armorHp:0,bonuses:Array(10).fill(0)});assert.equal(m.hpLi
 geared={...geared,hp:0};assert.equal(m.equip(geared,{armorHp:5}).hp,0);
 const oldSave=m.normalize({hp:4,coins:42,items:[]},'neko');assert.equal(oldSave.hp,4);assert.equal(m.hpLimit(oldSave),5);assert.equal(oldSave.coins,42);
 console.log('OK: equipment changes, no stacking, stat effects, no resurrection, old saves preserved.');
+
+assert.equal(m.initial('neko').coins,296);assert.equal(m.initial('neko').items.at(-1).quantity,9);assert.equal(m.initial('human').items.at(-1).quantity,3);
+const migrated=m.migrate({hp:2,coins:17,items:[],gear:{armorHp:3}},'neko');
+assert.equal(migrated.hp,2);assert.equal(migrated.gear.armorHp,3);assert.equal(migrated.coins,296);assert.equal(migrated.revision,1);
+const played=m.coins(migrated,-10);assert.equal(m.migrate(played,'neko').coins,286);
+console.log('OK: first-session snapshot migration runs only once and preserves HP and gear.');
