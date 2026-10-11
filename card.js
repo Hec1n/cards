@@ -6,6 +6,8 @@
   const cloudEnabled = globalThis.CardCloud?.enabled;
   const key = cloudEnabled ? 'imperial-player-card:cloud-cache:' + id : localKey;
   let cloud = null, canEdit = !cloudEnabled, canManageSkills = false;
+  let editingSlot = null;
+  const statLabels = ["Сила","Выносливость","Ловкость","Восприятие","Интеллект","Мудрость","Инициатива","Удача","Вера","Харизма"];
   let skills = CardSkills.initial(id);
   const get = name => document.getElementById(name);
   let state = model.initial(id);
@@ -58,7 +60,7 @@
     document.querySelectorAll('[data-movement]').forEach(el=>{el.textContent=Math.max(5,stats[2]*5);});
     get('initiative-value').textContent=stats[6];
     if(get('faith-value')) get('faith-value').textContent=stats[8];
-    get('stats-note').textContent='Показаны характеристики с бонусами оружия. Удача: '+stats[7]+'.';
+    get('stats-note').textContent='Показаны характеристики с бонусами оружия и надетых украшений. Удача: '+stats[7]+'.';
     get('hp-value').textContent = state.hp;
     get('hp-meter').value = state.hp;
     get('hp-meter').setAttribute('aria-label', 'ХП: ' + state.hp + ' из '+limit);
@@ -90,6 +92,16 @@
       row.append(text, remove);
       list.append(row);
     });
+    get('carry-limit').textContent=model.carryLimit(state);
+    const slots=get('slot-list');slots.replaceChildren();
+    state.gear.slots.forEach((slot,i)=>{
+      const row=document.createElement('article'), title=document.createElement('h3'), note=document.createElement('p'),button=document.createElement('button');
+      title.textContent=model.slotNames[i]+': '+(slot.name||'Пусто');
+      const bonuses=slot.bonuses.map((v,j)=>v?statLabels[j]+' '+(v>0?'+':'')+v:'').filter(Boolean).join(', ');
+      note.textContent=(slot.name?(slot.equipped?'Надето':'Снято'):'Не занято')+(bonuses?' · '+bonuses:'')+(i===16&&slot.name?' · Петельки: оружие'+(slot.potions?', зелья':''):'');
+      button.type='button';button.textContent='Изменить';button.setAttribute('aria-label','Изменить: '+model.slotNames[i]);button.addEventListener('click',()=>openSlot(i));
+      row.append(title,note,button);slots.append(row);
+    });
     const skillList=get('skills-list'); skillList.replaceChildren();
     skills.forEach(skill=>{
       const article=document.createElement('article'),row=document.createElement('p'),name=document.createElement('span'),level=document.createElement('strong');
@@ -102,8 +114,8 @@
   async function update(next, message = '') {
     if(cloudEnabled) {
       if(!cloud || !canEdit) {get('action-status').textContent='Войди и дождись загрузки общей карточки.';return;}
-      try { await cloud.save(next); get('action-status').textContent=message; }
-      catch(error) {get('action-status').textContent=error.message;}
+      try { await cloud.save(next); get('action-status').textContent=message; return true; }
+      catch(error) {get('action-status').textContent=error.message;return false;}
       return;
     }
     state = next;
@@ -112,7 +124,19 @@
     render();
     storageMessage();
     get('action-status').textContent = message;
+    return true;
   }
+  function openSlot(i){
+    if(!canEdit)return;editingSlot=i;const slot=state.gear.slots[i];get('slot-form').hidden=false;get('slot-title').textContent=model.slotNames[i];get('slot-name').value=slot.name;get('slot-equipped').checked=slot.equipped;get('slot-potions').checked=slot.potions;get('slot-potions-label').hidden=i!==16;get('slot-bonuses').hidden=i>=16;slot.bonuses.forEach((v,j)=>get('slot-bonus-'+j).value=v);get('slot-name').focus();
+  }
+  get('slot-cancel').addEventListener('click',()=>{get('slot-form').hidden=true;editingSlot=null;});
+  get('slot-form').addEventListener('submit',async event=>{
+    event.preventDefault();if(!canEdit||editingSlot===null)return;
+    const slots=state.gear.slots.map(slot=>({...slot,bonuses:[...slot.bonuses]}));
+    slots[editingSlot]={name:get('slot-name').value,equipped:get('slot-equipped').checked,potions:get('slot-potions').checked,bonuses:Array.from({length:10},(_,j)=>Number(get('slot-bonus-'+j).value))};
+    const ok=await update(model.equip(state,{slots}),'Снаряжение сохранено. Характеристики, ХП и переносимый вес пересчитаны.');
+    if(ok){get('slot-form').hidden=true;editingSlot=null;}
+  });
   get('add-skill').addEventListener('click',()=>{
     if(!canManageSkills||!canEdit)return;
     get('skill-form').hidden=false;get('add-skill').setAttribute('aria-expanded','true');get('skill-name').focus();

@@ -3,8 +3,10 @@ globalThis.CardState = (() => {
   const maxHp = 5;
   const maxCoins = 999999999;
   const baseStats = {neko:[1,1,2,1,2,1,1,1,0,1],human:[1,1,1,1,1,1,1,1,2,1]};
-  const gearDefaults = id => ({armorName:'Туника',armorHp:0,weaponName:id==='neko'?'Длинный лук из дуба':'Глефа из железа',damage:id==='neko'?'2–3':'1–3',range:id==='neko'?'16 клеток':'Ближний бой',bonuses:Array(10).fill(0)});
-  const totalStats = state => baseStats[state.id].map((v,i)=>v+state.gear.bonuses[i]);
+  const slotNames = [...Array.from({length:10},(_,i)=>'Кольцо '+(i+1)), 'Ожерелье 1','Ожерелье 2', ...Array.from({length:4},(_,i)=>'Серьга '+(i+1)), 'Пояс','Колчан'];
+  const slotDefaults = id => slotNames.map((_,i)=>({name:i===16?'Пояс для оружия':i===17&&id==='neko'?'Колчан':'',equipped:i===16||(i===17&&id==='neko'),potions:false,bonuses:Array(10).fill(0)}));
+  const gearDefaults = id => ({armorName:'Туника',armorHp:0,weaponName:id==='neko'?'Длинный лук из дуба':'Глефа из железа',slots:slotDefaults(id),damage:id==='neko'?'2–3':'1–3',range:id==='neko'?'16 клеток':'Ближний бой',bonuses:Array(10).fill(0)});
+  const totalStats = state => baseStats[state.id].map((v,i)=>v+state.gear.bonuses[i]+(state.gear.slots||[]).slice(0,16).reduce((sum,slot)=>sum+(slot.equipped&&slot.name?slot.bonuses[i]:0),0));
   const hpLimit = state => Math.max(3,3+2*totalStats(state)[1])+state.gear.armorHp;
   const whole = (value, fallback, min, max) => Number.isSafeInteger(value)
     ? Math.min(max, Math.max(min, value)) : fallback;
@@ -20,6 +22,7 @@ globalThis.CardState = (() => {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return fallback;
     const g=value.gear || {};
     const gear={...gearDefaults(id),armorName:typeof g.armorName==='string'&&g.armorName.trim()?g.armorName.trim().slice(0,120):'Туника',armorHp:whole(g.armorHp,0,0,999),weaponName:typeof g.weaponName==='string'&&g.weaponName.trim()?g.weaponName.trim().slice(0,120):gearDefaults(id).weaponName,damage:typeof g.damage==='string'&&g.damage.trim()?g.damage.trim().slice(0,50):gearDefaults(id).damage,bonuses:Array.from({length:10},(_,i)=>whole(g.bonuses?.[i],0,0,999))};
+    gear.slots=slotDefaults(id).map((fallback,i)=>{const slot=g.slots?.[i];if(!slot||typeof slot!=='object')return fallback;const name=typeof slot.name==='string'?slot.name.trim().slice(0,120):'';return {name,equipped:Boolean(name&&slot.equipped),potions:i===16&&slot.potions===true,bonuses:Array.from({length:10},(_,j)=>i<16?whole(slot.bonuses?.[j],0,-999,999):0)};});
     gear.range=typeof g.range==='string'&&g.range.trim()?g.range.trim().slice(0,80):gearDefaults(id).range;
     return {
       id, gear, revision: whole(value.revision,0,0,999),
@@ -62,5 +65,6 @@ globalThis.CardState = (() => {
     next.hp=state.hp===0?0:Math.max(0,Math.min(hpLimit(next),state.hp+hpLimit(next)-hpLimit(state)));
     return next;
   }
-  return { maxHp, maxCoins, initial, normalize, migrate, hp, coins, add, remove, totalStats, hpLimit, equip };
+  const carryLimit = state => Math.max(0,totalStats(state)[0]*15);
+  return { slotNames, carryLimit, maxHp, maxCoins, initial, normalize, migrate, hp, coins, add, remove, totalStats, hpLimit, equip };
 })();

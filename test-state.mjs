@@ -40,3 +40,21 @@ const migrated=m.migrate({hp:2,coins:17,items:[],gear:{armorHp:3}},'neko');
 assert.equal(migrated.hp,2);assert.equal(migrated.gear.armorHp,3);assert.equal(migrated.coins,296);assert.equal(migrated.revision,1);
 const played=m.coins(migrated,-10);assert.equal(m.migrate(played,'neko').coins,286);
 console.log('OK: first-session snapshot migration runs only once and preserves HP and gear.');
+
+// Jewelry is temporary, fixed-size and preserves existing shared state.
+let jewel=m.normalize({...m.initial('neko'),coins:717},'neko');
+assert.equal(jewel.gear.slots.length,18);
+assert.equal(jewel.gear.slots[17].name,'Колчан');
+assert.equal(m.initial('human').gear.slots[17].name,'');
+assert.equal(jewel.gear.slots[16].potions,false);
+const slots=jewel.gear.slots.map(x=>({...x,bonuses:[...x.bonuses]}));
+slots[0]={name:'Кольцо силы',equipped:true,bonuses:[2,1,0,0,0,0,0,0,0,0]};
+jewel=m.equip(jewel,{slots});
+assert.equal(m.totalStats(jewel)[0],3);assert.equal(m.carryLimit(jewel),45);assert.equal(m.hpLimit(jewel),7);assert.equal(jewel.hp,7);assert.equal(jewel.coins,717);
+jewel=m.hp(jewel,-2);
+jewel=m.equip(jewel,{slots:jewel.gear.slots.map((x,i)=>i===0?{...x,equipped:false}:x)});
+assert.equal(m.carryLimit(jewel),15);assert.equal(jewel.hp,3);assert.equal(jewel.gear.slots[0].name,'Кольцо силы');
+assert.equal(m.normalize(JSON.parse(JSON.stringify(jewel)),'neko').gear.slots[0].equipped,false);
+const dead=m.equip({...jewel,hp:0},{slots});assert.equal(dead.hp,0);
+const empty=m.equip(jewel,{slots:slots.map((x,i)=>i===0?{...x,name:''}:x)});assert.equal(m.carryLimit(empty),15);
+console.log('OK: accessory bonuses, removal, persistence, carrying weight and no resurrection.');

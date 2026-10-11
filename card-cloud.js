@@ -10,7 +10,7 @@ globalThis.CardCloud = (() => {
     const lock = () => onAccess(editable && loaded && !busy, skillManager);
     async function refresh(force = false) {
       if (busy || stopped) return;
-      if (!force && (!get('armor-form').hidden || !get('weapon-form').hidden || (get('skill-form') && !get('skill-form').hidden))) return;
+      if (!force && (!get('armor-form').hidden || !get('weapon-form').hidden || (get('skill-form') && !get('skill-form').hidden) || (get('slot-form') && !get('slot-form').hidden))) return;
       busy = true; lock();
       try {
         const {data, error} = await client.from('cards').select('state, revision, skills').eq('id', id).single();
