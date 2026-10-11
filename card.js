@@ -6,6 +6,7 @@
   const cloudEnabled = globalThis.CardCloud?.enabled;
   const key = cloudEnabled ? 'imperial-player-card:cloud-cache:' + id : localKey;
   let cloud = null, canEdit = !cloudEnabled, canManageSkills = false;
+  let editingSkill = null;
   let editingSlot = null;
   const statLabels = ["Сила","Выносливость","Ловкость","Восприятие","Интеллект","Мудрость","Инициатива","Удача","Вера","Харизма"];
   let skills = CardSkills.initial(id);
@@ -46,6 +47,10 @@
     render();
   }
   function render() {
+    get('notes-text').textContent=state.notes||'Нет записей.';
+    get('eira-value').textContent=state.eira;get('eira-meter').value=state.eira;get('eira-meter').setAttribute('aria-label','Эйра: '+state.eira+' из 100');
+    const energyAmount=Number(get('eira-amount').value),energyValid=Number.isInteger(energyAmount)&&energyAmount>0&&energyAmount<=100;
+    get('eira-minus').disabled=!energyValid||state.eira<energyAmount;get('eira-plus').disabled=!energyValid||state.eira+energyAmount>100;
     const limit=model.hpLimit(state);
     const stats=model.totalStats(state);
     get('hp-max').textContent=limit;
@@ -104,10 +109,10 @@
       row.append(title,note,button);(i>=16?utility:i>=12?earrings:slots).append(row);
     });
     const skillList=get('skills-list'); skillList.replaceChildren();
-    skills.forEach(skill=>{
+    skills.forEach((skill,index)=>{
       const article=document.createElement('article'),row=document.createElement('p'),name=document.createElement('span'),level=document.createElement('strong');
       name.textContent=skill.name;level.textContent=skill.level+' уровень';row.append(name,level);article.append(row);
-      if(skill.description){const note=document.createElement('div');note.className='hint skill-description';note.textContent=skill.description;article.append(note);}
+      if(canManageSkills){const edit=document.createElement('button');edit.type='button';edit.textContent='Изменить';edit.setAttribute('aria-label','Изменить навык '+skill.name);edit.addEventListener('click',()=>{if(!canEdit)return;editingSkill=index;get('skill-name').value=skill.name;get('skill-level').value=skill.level;get('skill-form').hidden=false;get('skill-name').focus();});article.append(edit);}
       skillList.append(article);
     });
     applyAccess();
@@ -138,18 +143,24 @@
     const ok=await update(model.equip(state,{slots}),'Снаряжение сохранено. Характеристики, ХП и переносимый вес пересчитаны.');
     if(ok){get('slot-form').hidden=true;editingSlot=null;}
   });
+  get('edit-notes').addEventListener('click',()=>{if(!canEdit)return;get('notes-input').value=state.notes;get('notes-form').hidden=false;get('notes-input').focus();});
+  get('cancel-notes').addEventListener('click',()=>{get('notes-form').hidden=true;});
+  get('notes-form').addEventListener('submit',async event=>{event.preventDefault();if(!canEdit)return;const ok=await update({...state,notes:get('notes-input').value.slice(0,8000)},'Памятка сохранена.');if(ok)get('notes-form').hidden=true;});
+  get('eira-amount').addEventListener('input',render);
+  get('eira-minus').addEventListener('click',()=>{const n=Number(get('eira-amount').value);if(Number.isInteger(n)&&n>0&&n<=state.eira)update(model.eira(state,-n),'Запас Эйры сохранён.');});
+  get('eira-plus').addEventListener('click',()=>{const n=Number(get('eira-amount').value);if(Number.isInteger(n)&&n>0&&state.eira+n<=100)update(model.eira(state,n),'Запас Эйры сохранён.');});
   get('add-skill').addEventListener('click',()=>{
     if(!canManageSkills||!canEdit)return;
-    get('skill-form').hidden=false;get('add-skill').setAttribute('aria-expanded','true');get('skill-name').focus();
+    editingSkill=null;get('skill-form').reset();get('skill-form').hidden=false;get('add-skill').setAttribute('aria-expanded','true');get('skill-name').focus();
   });
   get('cancel-skill').addEventListener('click',()=>{get('skill-form').hidden=true;get('add-skill').setAttribute('aria-expanded','false');get('add-skill').focus();});
   get('skill-form').addEventListener('submit',async event=>{
     event.preventDefault();if(!cloud||!canManageSkills||!canEdit)return;
     try{
-      const next=CardSkills.add(skills,get('skill-name').value,Number(get('skill-level').value),get('skill-description').value);
+      const next=editingSkill===null?CardSkills.add(skills,get('skill-name').value,Number(get('skill-level').value),''):CardSkills.update(skills,editingSkill,get('skill-name').value,Number(get('skill-level').value));
       await cloud.saveSkills(next);
       get('skill-form').reset();get('skill-form').hidden=true;get('add-skill').setAttribute('aria-expanded','false');
-      get('skill-status').textContent='Навык добавлен и сохранён для игрока.';get('add-skill').focus();
+      editingSkill=null;get('skill-status').textContent='Навык сохранён.';get('add-skill').focus();
     }catch(error){get('skill-status').textContent=error.message;}
   });
   get('hp-minus').addEventListener('click', () => update(model.hp(state, -1)));

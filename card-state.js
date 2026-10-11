@@ -1,5 +1,6 @@
 /* Общие операции над локальным состоянием карточки. */
 globalThis.CardState = (() => {
+  const defaultNotes='Обычно доступна одна атака за ход.\nЕсли переместиться меньше своего предела, можно затем атаковать или достать предмет.\nПри 0 ХП теряешь сознание. На спасение есть 5 раундов.';
   const maxHp = 5;
   const maxCoins = 999999999;
   const baseStats = {neko:[1,1,2,1,2,1,1,1,0,1],human:[1,1,1,1,1,1,1,1,2,1]};
@@ -11,7 +12,7 @@ globalThis.CardState = (() => {
   const whole = (value, fallback, min, max) => Number.isSafeInteger(value)
     ? Math.min(max, Math.max(min, value)) : fallback;
   function initial(id) {
-    return { id, gear:gearDefaults(id), revision: 1, hp: 5, coins: id === 'neko' ? 296 : 386, items: [
+    return { id, gear:gearDefaults(id), revision: 1, notes:defaultNotes, eira:100, hp: 5, coins: id === 'neko' ? 296 : 386, items: [
       { name: id === 'neko' ? 'Длинный лук из дуба' : 'Глефа из железа', quantity: 1 },
       { name: 'Туника', quantity: 1 },
       { name: id === 'neko' ? 'Стрелы' : 'Кинжалы', quantity: id === 'neko' ? 9 : 3 }
@@ -26,6 +27,8 @@ globalThis.CardState = (() => {
     gear.range=typeof g.range==='string'&&g.range.trim()?g.range.trim().slice(0,80):gearDefaults(id).range;
     return {
       id, gear, revision: whole(value.revision,0,0,999),
+      notes:typeof value.notes==='string'?value.notes.slice(0,8000):defaultNotes,
+      eira: whole(value.eira,100,0,100),
       hp: whole(value.hp, 5, 0, hpLimit({id,gear})),
       coins: whole(value.coins, 0, 0, maxCoins),
       items: Array.isArray(value.items) ? value.items.filter(item =>
@@ -66,5 +69,5 @@ globalThis.CardState = (() => {
     return next;
   }
   const carryLimit = state => Math.max(0,totalStats(state)[0]*15);
-  return { slotNames, carryLimit, maxHp, maxCoins, initial, normalize, migrate, hp, coins, add, remove, totalStats, hpLimit, equip };
+  return { eira:(state,delta)=>({...state,eira:whole(state.eira+delta,state.eira,0,100)}), slotNames, carryLimit, maxHp, maxCoins, initial, normalize, migrate, hp, coins, add, remove, totalStats, hpLimit, equip };
 })();

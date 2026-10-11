@@ -52,3 +52,11 @@ assert.throws(()=>context.CardSkills.add(initial,'Тест',0,''),/Укажи/);
 assert.throws(()=>context.CardSkills.add(initial,' ',1,''),/Укажи/);
 const next=context.CardSkills.add(initial,'Новый',3,'Описание');assert.equal(next.length,4);assert.equal(initial.length,3);
 console.log('OK: GM-only skills RPC, skill rendering callback, duplicates, invalid inputs and immutable add.');
+
+const edited=context.CardSkills.update(next,0,'Уклонение',4);assert.equal(edited[0].level,4);assert.equal(next[0].level,2);assert.equal(edited[0].description,'');
+assert.throws(()=>context.CardSkills.update(next,0,'Новый',4),/уже есть/);
+assert.throws(()=>context.CardSkills.update(next,0,'Уклонение',0),/Укажи/);
+await gm.save({...context.CardState.normalize(row.state,'human'),eira:63});assert.equal(row.state.eira,63);
+console.log('OK: skill editing and shared Eira save.');
+
+await gm.save({...context.CardState.normalize(row.state,'human'),notes:'Заметка игрока'});assert.equal(row.state.notes,'Заметка игрока');assert.equal(row.state.eira,63);console.log('OK: shared notes preserve energy.');

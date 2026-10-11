@@ -58,3 +58,12 @@ assert.equal(m.normalize(JSON.parse(JSON.stringify(jewel)),'neko').gear.slots[0]
 const dead=m.equip({...jewel,hp:0},{slots});assert.equal(dead.hp,0);
 const empty=m.equip(jewel,{slots:slots.map((x,i)=>i===0?{...x,name:''}:x)});assert.equal(m.carryLimit(empty),15);
 console.log('OK: accessory bonuses, removal, persistence, carrying weight and no resurrection.');
+
+let energy=m.normalize({id:'human',hp:3,coins:123,items:[]},'human');assert.equal(energy.eira,100);
+energy=m.eira(energy,-37);assert.equal(energy.eira,63);assert.equal(energy.hp,3);assert.equal(energy.coins,123);
+assert.equal(m.normalize(JSON.parse(JSON.stringify(energy)),'human').eira,63);
+assert.equal(m.eira(energy,-999).eira,0);assert.equal(m.eira(energy,999).eira,100);
+assert.equal(m.normalize({...energy,eira:0},'human').eira,0);
+console.log('OK: Eira migration, persistence and bounds.');
+
+const notes=m.normalize({...energy,notes:'Проверить храм\nКупить стрелы'},'human');assert.equal(notes.notes,'Проверить храм\nКупить стрелы');assert.equal(m.equip(notes,{}).notes,notes.notes);assert.equal(m.normalize({...notes,notes:''},'human').notes,'');console.log('OK: editable notes persist and can be cleared.');
