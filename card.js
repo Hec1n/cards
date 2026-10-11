@@ -93,14 +93,15 @@
       list.append(row);
     });
     get('carry-limit').textContent=model.carryLimit(state);
-    const slots=get('slot-list');slots.replaceChildren();
+    const slots=get('slot-list'),earrings=get('earring-slot-list'),utility=get('utility-slot-list');slots.replaceChildren();earrings.replaceChildren();utility.replaceChildren();
+    get('earrings-count').textContent='· надето '+state.gear.slots.slice(12,16).filter(slot=>slot.name&&slot.equipped).length;
     state.gear.slots.forEach((slot,i)=>{
       const row=document.createElement('article'), title=document.createElement('h3'), note=document.createElement('p'),button=document.createElement('button');
       title.textContent=model.slotNames[i]+': '+(slot.name||'Пусто');
       const bonuses=slot.bonuses.map((v,j)=>v?statLabels[j]+' '+(v>0?'+':'')+v:'').filter(Boolean).join(', ');
       note.textContent=(slot.name?(slot.equipped?'Надето':'Снято'):'Не занято')+(bonuses?' · '+bonuses:'')+(i===16&&slot.name?' · Петельки: оружие'+(slot.potions?', зелья':''):'');
       button.type='button';button.textContent='Изменить';button.setAttribute('aria-label','Изменить: '+model.slotNames[i]);button.addEventListener('click',()=>openSlot(i));
-      row.append(title,note,button);slots.append(row);
+      row.append(title,note,button);(i>=16?utility:i>=12?earrings:slots).append(row);
     });
     const skillList=get('skills-list'); skillList.replaceChildren();
     skills.forEach(skill=>{
