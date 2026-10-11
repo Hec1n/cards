@@ -10,6 +10,7 @@ globalThis.CardCloud = (() => {
     const lock = () => onAccess(editable && loaded && !busy, skillManager);
     async function refresh(force = false) {
       if (busy || stopped) return;
+      if (!force && document.activeElement?.closest?.('#inventory-list')) return;
       if (!force && (!get('armor-form').hidden || !get('weapon-form').hidden || (get('skill-form') && !get('skill-form').hidden) || (get('slot-form') && !get('slot-form').hidden) || (get('notes-form') && !get('notes-form').hidden))) return;
       busy = true; lock();
       try {

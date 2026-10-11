@@ -67,3 +67,11 @@ assert.equal(m.normalize({...energy,eira:0},'human').eira,0);
 console.log('OK: Eira migration, persistence and bounds.');
 
 const notes=m.normalize({...energy,notes:'Проверить храм\nКупить стрелы'},'human');assert.equal(notes.notes,'Проверить храм\nКупить стрелы');assert.equal(m.equip(notes,{}).notes,notes.notes);assert.equal(m.normalize({...notes,notes:''},'human').notes,'');console.log('OK: editable notes persist and can be cleared.');
+
+let stack=m.add(m.initial('human'),'Зелье',5);const idx=stack.items.length-1;
+const partial=m.remove(stack,idx,2);assert.equal(partial.items[idx].quantity,3);assert.equal(stack.items[idx].quantity,5);
+assert.equal(m.remove(partial,idx,4),partial);assert.equal(m.remove(partial,idx,0),partial);assert.equal(m.remove(partial,idx,1.5),partial);assert.equal(m.remove(partial,idx,3).items.length,idx);
+const beltSlots=partial.gear.slots.map((x,i)=>i===16?{...x,potions:true,contents:'Зелье лечения +2 ХП × 3'}:x);
+const withBelt=m.equip(partial,{slots:beltSlots});assert.equal(withBelt.gear.slots[16].contents,'Зелье лечения +2 ХП × 3');assert.equal(withBelt.items[idx].quantity,3);
+assert.equal(m.normalize(JSON.parse(JSON.stringify(withBelt)),'human').gear.slots[16].contents,withBelt.gear.slots[16].contents);
+console.log('OK: partial inventory removal and persistent belt contents.');
