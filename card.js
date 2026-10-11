@@ -40,8 +40,9 @@
   }
   function access(allowed, manageSkills = false) {
     canEdit=allowed; canManageSkills=manageSkills;
-    get('add-skill').hidden=!canManageSkills;
+    get('add-skill').hidden=false;
     if(!canManageSkills) get('skill-form').hidden=true;
+    get('skill-access').textContent=canManageSkills?'':'Для управления навыками войди в аккаунт мастера вверху карточки.';
     document.querySelectorAll('main button,main input,main textarea').forEach(el=>{
       if(!el.closest('#cloud-panel')) el.disabled=false;
     });
@@ -119,9 +120,12 @@
     skills.forEach((skill,index)=>{
       const article=document.createElement('article'),row=document.createElement('p'),name=document.createElement('span'),level=document.createElement('strong');
       name.textContent=skill.name;level.textContent=skill.level+' уровень';row.append(name,level);article.append(row);
-      if(canManageSkills){const edit=document.createElement('button');edit.type='button';edit.textContent='Изменить';edit.setAttribute('aria-label','Изменить навык '+skill.name);edit.addEventListener('click',()=>{if(!canEdit)return;editingSkill=index;get('skill-name').value=skill.name;get('skill-level').value=skill.level;get('skill-form').hidden=false;get('skill-name').focus();});article.append(edit);}
+      {const edit=document.createElement('button');edit.type='button';edit.textContent='Название / уровень';edit.disabled=!canManageSkills||!canEdit;edit.setAttribute('aria-label','Изменить навык '+skill.name);edit.addEventListener('click',()=>{if(!canEdit||!canManageSkills)return;editingSkill=index;get('skill-name').value=skill.name;get('skill-level').value=skill.level;get('skill-form').hidden=false;get('skill-name').focus();});const remove=document.createElement('button');remove.type='button';remove.textContent='Удалить';remove.disabled=!canManageSkills||!canEdit;remove.setAttribute('aria-label','Удалить навык '+skill.name);
+        remove.addEventListener('click',async()=>{if(!canManageSkills||!canEdit||!cloud)return;try{await cloud.saveSkills(CardSkills.remove(skills,index));get('skill-form').hidden=true;editingSkill=null;get('skill-status').textContent='Удалён навык: '+skill.name;}catch(error){get('skill-status').textContent=error.message;}});
+        const controls=document.createElement('div');controls.className='counter-controls';controls.append(edit,remove);article.append(controls);}
       skillList.append(article);
     });
+    get('add-skill').disabled=!canManageSkills||!canEdit;
     applyAccess();
     get('belt-contents').disabled=!canEdit||!get('slot-potions').checked;
   }

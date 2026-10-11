@@ -60,3 +60,7 @@ await gm.save({...context.CardState.normalize(row.state,'human'),eira:63});asser
 console.log('OK: skill editing and shared Eira save.');
 
 await gm.save({...context.CardState.normalize(row.state,'human'),notes:'Заметка игрока'});assert.equal(row.state.notes,'Заметка игрока');assert.equal(row.state.eira,63);console.log('OK: shared notes preserve energy.');
+
+const afterRemoval=context.CardSkills.remove(edited,0);assert.equal(afterRemoval.length,edited.length-1);assert.equal(edited[0].name,'Уклонение');assert.throws(()=>context.CardSkills.remove(edited,-1),/не найден/);
+await gm.saveSkills(afterRemoval);assert.equal(receivedSkills.length,afterRemoval.length);await assert.rejects(player.saveSkills(afterRemoval),/только мастер/);
+console.log('OK: GM skill removal saves without changing the source list; player access rejected.');
